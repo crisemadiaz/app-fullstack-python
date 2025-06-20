@@ -1,38 +1,43 @@
 version: 2.1
 
 jobs:
-  build-and-test:
-    docker:
-      - image: cimg/python:3.11
-    steps:
-      - checkout
-      - run:
-          name: Crear entorno virtual
-          command: python -m venv venv
-      - run:
-          name: Instalar dependencias
-          command: |
-            . venv/bin/activate
-            pip install -r requirements.txt
-      - run:
-          name: Ejecutar tests
-          command: |
-            . venv/bin/activate
-            pytest backend/tests
-
   deploy:
     docker:
       - image: cimg/python:3.11
     steps:
+      - checkout
+
       - run:
-          name: Simular despliegue
-          command: echo "Despliegue exitoso"
+          name: Instalar openssh
+          command: |
+            sudo apt update && sudo apt install -y openssh-client
+
+      - add_ssh_keys:
+          fingerprints:
+            - "placeholder"  # no hace falta si usamos clave vía variable ENV
+
+      - run:
+          name: Crear archivo de clave privada
+          command: |
+            echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+            chmod 600 ~/.ssh/deploy_key
+
+      - run:
+          name: Copiar código al servidor
+          command: |
+            scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r . usuario@ip-remota:/home/usuario/app-flask
+
+      - run:
+          name: Ejecutar app en el servidor
+          command: |
+            ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no usuario@ip-remota "
+              cd /home/usuario/app-flask &&
+              nohup python3 backend/app.py > app.log 2>&1 &
+            "
 
 workflows:
   version: 2
-  build-test-deploy:
+  deploy-on-push:
     jobs:
-      - build-and-test
-      - deploy:
-          requires:
-            - build-and-test
+      - deploy
+
