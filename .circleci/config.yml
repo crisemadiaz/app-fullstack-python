@@ -8,30 +8,30 @@ jobs:
       - checkout
 
       - run:
-          name: Instalar openssh
+          name: Instalar OpenSSH
           command: |
             sudo apt update && sudo apt install -y openssh-client
-
-      - add_ssh_keys:
-          fingerprints:
-            - "placeholder"  # no hace falta si usamos clave vía variable ENV
 
       - run:
           name: Crear archivo de clave privada
           command: |
+            mkdir -p ~/.ssh
             echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
             chmod 600 ~/.ssh/deploy_key
 
       - run:
           name: Copiar código al servidor
           command: |
-            scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r . usuario@ip-remota:/home/usuario/app-flask
+            scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -r . $DEPLOY_USER@$DEPLOY_HOST:/home/$DEPLOY_USER/github-cicd/app-fullstack-python
 
       - run:
-          name: Ejecutar app en el servidor
+          name: Reiniciar servidor Flask
           command: |
-            ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no usuario@ip-remota "
-              cd /home/usuario/app-flask &&
+            ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no $DEPLOY_USER@$DEPLOY_HOST "
+              echo '🛑 Terminando Flask anterior si existe...';
+              pkill -f 'python3 backend/app.py' || echo 'Ningún proceso Flask corriendo';
+              echo '🚀 Iniciando nueva instancia Flask...';
+              cd /home/$DEPLOY_USER/github-cicd/app-fullstack-python &&
               nohup python3 backend/app.py > app.log 2>&1 &
             "
 
